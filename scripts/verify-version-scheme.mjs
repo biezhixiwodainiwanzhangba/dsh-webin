@@ -70,7 +70,8 @@ console.log('\n[3] ⭐ 产物里的版本号与 package.json 一致')
   check('⭐ 与 package.json 一致', m?.[1], pkg.version)
   /** 提交号仍要注入 —— 它回答「跑的哪份代码」。 */
   const c = /if \(name === "commit" && true\) return "([^"]+)"/.exec(hostBundle)
-  check('⭐ 提交号仍注入', c !== null && /^[0-9a-f]{7}$/.test(c[1]), true)
+  /** ⚠️ 无 .git 时 readCommit() 给 'unknown' —— 见 verify-version 里的说明。 */
+  check('⭐ 提交号仍注入（无 git 时允许 unknown）', c !== null && /^([0-9a-f]{7}|unknown)$/.test(c[1]), true)
   /** 构建时间也保留 —— 它比提交号直观（pull 后忘了 build 一眼能看出）。 */
   const b = /if \(name === "builtAt" && true\) return "([^"]+)"/.exec(hostBundle)
   check('⭐ 构建时间仍注入', b !== null && /^20\d\d-/.test(b[1]), true)

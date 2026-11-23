@@ -1,5 +1,8 @@
 # dsh-webin
 
+> **仅桌面版 DSH 可用。** 本插件依赖 Electron 宿主的 webview guest 桥（`globalThis.dshDesktop.browser`）。
+> 纯 Web 版 DSH 没有这个桥 —— 装了只会显示「面板未就绪」，不是 bug。
+
 Unofficial DSH plugin — 用**真实浏览器**驱动多个 AI 网页版（DeepSeek / 通义千问 / …）。
 
 核心思路是**不设计协议，操作界面**：打开真浏览器 → 用真实输入把字打进输入框 →
@@ -49,8 +52,8 @@ const bridge = carrier.browser                // acquire / release
 | 第三方 Electron 壳（未补桥） | ❌ | 默认没有桥 |
 | 自建 Electron 壳（已补 `webviewTag` + preload 注入） | ✅ | 参见下方“没有官方 Desktop 时” |
 
-**在无桥宿主上的行为**：插件**仍然能安装并加载**，模型选择器里也会出现 LDW，
-但发任何消息都会失败。现在它会**明确告诉你原因**（而不是误导成“标签没打开”），
+**在无桥宿主上的行为**：插件**仍然能安装并加载**，LDW 标签页也能打开站点页面，
+但“让模型代聊”这条链路不可用。现在它会**明确告诉你原因**（而不是误导成“标签没打开”），
 并在 `/status` 的 `hostCapability` 字段里报 `no-desktop-bridge`。
 
 ```powershell
@@ -75,9 +78,12 @@ dsh plugin --profile desktop add dsh-webin
 > 装错 profile 的典型症状就是“插件看不见”。
 
 装完**重启 DSH**（host 半没有热重载）。然后在对话区会出现 **LDW** 标签，
-模型选择器里出现「LDW · DeepSeek 网页版」。
+点开就是真实网页版（DeepSeek / 豆包 / 元宝 / Kimi / 通义…），可以直接在里面聊。
 
-首次使用：切到 LDW 标签 → 登录一次 → 回到对话选 LDW 模型。
+> **模型选择器里默认不出现任何 LDW 条目**（`exposeModelsInPicker: false`）。
+> 这是有意为之：这个插件的主用途是「在 DSH 里开一个别家 AI 的网页对话窗口」，
+> 不是把网页版包装成 DSH 模型。想把网页版当模型用，去设置页打开
+> 「在模型选择器里显示网页版模型」——打开后才会列出 `LDW · …` 分组。
 
 ## 没有官方 Desktop 时
 
@@ -225,8 +231,9 @@ Invoke-WebRequest "http://127.0.0.1:19387/dsh-webin/api/providers" -Method Post 
   -Headers $h -ContentType "application/json" -Body $body
 ```
 
-装好后**立刻生效**（host 会热重载路由），新平台出现在模型选择器里，
+装好后**立刻生效**（host 会热重载路由），新平台出现在 LDW 面板顶部的下拉里，
 文件落在 `~/.dsh/webin/providers/<id>.json`，跨重启存活。
+（它是否出现在**模型选择器**里，取决于设置页的 `exposeModelsInPicker`，默认关。）
 
 **3. 在 LDW 面板顶部的下拉里选中它**，登录一次即可（登录态独立保存）。
 

@@ -217,6 +217,16 @@ const cleanupState = isolate('webin-tool-chunks')
  * 这里模拟「已经登录过」，让测试专注于 chunk 契约。
  */
 mkdirSync(join(process.env.DSH_HOME, 'webin', 'auth'), { recursive: true })
+
+/**
+ * ⚠️ **必须关掉 userOnly**。
+ *
+ * 插件默认 `userOnly: true`（首轮 prompt 只有用户原话，用户 m01098 的要求），
+ * 那样首轮根本不会带工具目录/协议 —— 本测试要测的是「工具注入 + 结果回灌」
+ * 这条链路，所以这里显式走全量差分。userOnly 的行为由 verify-useronly 覆盖。
+ */
+writeFileSync(join(process.env.DSH_HOME, 'webin', 'config.json'), JSON.stringify({ userOnly: false }), 'utf8')
+
 for (const platform of ['deepseek', 'qwen']) {
   writeFileSync(
     join(process.env.DSH_HOME, 'webin', 'auth', `${platform}.json`),

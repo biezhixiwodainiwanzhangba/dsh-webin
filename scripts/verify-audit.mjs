@@ -507,13 +507,23 @@ console.log('\n[U] ⭐⭐ 交付判据：内容不再增长 + 静默够久（防
     true,
   )
   /** 领活时重置变化时刻（新任务从此刻开始算静默）。 */
-  check('⭐ 领活时重置变化时刻', /baselineTextRef\.current = typeof base\.last[\s\S]{0,200}scrapedChangedAtRef\.current = Date\.now\(\)/.test(clientSrc), true)
+  /**
+   * ⚠️ 间距给到 600 —— 中间还要插 `baselinePageRef` / `baselinePageOkRef` /
+   * try-catch 的收尾（增量差分基线加进来之后 200 字符就不够了）。
+   */
+  check('⭐ 领活时重置变化时刻', /baselineTextRef\.current = typeof base\.last[\s\S]{0,600}scrapedChangedAtRef\.current = Date\.now\(\)/.test(clientSrc), true)
   /** 统一清理要含它。 */
-  const fn = /const clearPending = \(\) => \{([\s\S]{0,500}?)\}/.exec(clientSrc)
-  check('找到 clearPending', fn !== null, true)
-  if (fn !== null) {
-    for (const f of ['pendingJobRef', 'pendingSinceRef', 'scrapedRef', 'scrapedChangedAtRef', 'baselineRef', 'baselineTextRef']) {
-      check(`⭐ clearPending 清 ${f}`, new RegExp(`${f}\\.current = `).test(fn[1]), true)
+  /**
+   * ⚠️ 用 indexOf 找函数体，不用 `{0,500}?}` 这种带长度上限的正则 ——
+   * clearPending 现在有 11 个清理项，早就超过 500 字符了（会静默取不到）。
+   */
+  const iClear = clientSrc.indexOf('const clearPending = () => {')
+  const iClearEnd = iClear === -1 ? -1 : clientSrc.indexOf('\n      }', iClear)
+  const clearBody = iClear === -1 || iClearEnd === -1 ? null : clientSrc.slice(iClear, iClearEnd)
+  check('找到 clearPending', clearBody !== null, true)
+  if (clearBody !== null) {
+    for (const f of ['pendingJobRef', 'pendingSinceRef', 'scrapedRef', 'scrapedChangedAtRef', 'baselineRef', 'baselineTextRef', 'baselinePageRef']) {
+      check(`⭐ clearPending 清 ${f}`, new RegExp(`${f}\\.current = `).test(clearBody), true)
     }
   }
 }

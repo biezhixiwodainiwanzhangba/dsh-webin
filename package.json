@@ -1,7 +1,7 @@
 {
   "name": "dsh-webin",
-  "version": "0.2.25",
-  "description": "Unofficial DSH plugin: drive chat.deepseek.com in a REAL browser (DSH webview guest) — real login, real typing, real send, reply captured from the page. Works as a DSH model provider (LDW).",
+  "version": "0.3.0",
+  "description": "仅桌面版 DSH（Electron webview 桥）可用。非官方插件：用真实浏览器驱动 chat.deepseek.com / 豆包 等网页版 — 真登录、真打字、真发送，回复从页面 DOM 读出，可作为 DSH 模型 provider。",
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
@@ -14,7 +14,7 @@
     "./package.json": "./package.json"
   },
   "files": [
-    "lib",
+    "lib/*.js",
     "cordis.patch.yml",
     "README.md",
     "provider.example.json",
@@ -33,6 +33,8 @@
     "dsh",
     "deepseek-harness",
     "cordis-plugin",
+    "dsh-plugin",
+    "plugin-market",
     "deepseek",
     "webview"
   ],
@@ -103,6 +105,7 @@
     "verify:session-e2e": "node scripts/verify-session-e2e.mjs"
   },
   "engines": {
+    "dsh": ">=0.2.2-rc.5",
     "node": "^22.18.0 || >=24.11.0"
   },
   "devDependencies": {

@@ -223,14 +223,30 @@ export const textOut = (chunks) =>
 /**
  * 准备隔离状态目录 + 登录快照（不写快照的话 stream 直接报 NOT_LOGGED_IN）。
  *
+ * ## 为什么要写 config.json（v0.2.27 起）
+ *
+ * 插件默认 `userOnly: true` —— 首轮 prompt **只有用户原话**，不带系统提示词、
+ * 工具目录、历史。这对「网页版对话」是对的，但凡是**测工具链路**的测试
+ * （首轮 prompt 含工具目录 / 含协议 / 含【工具结果】）就再也测不到了：
+ * 断言全部落空，看起来像「工具注入坏了」，实际是默认值变了。
+ *
+ * 所以测试台统一写 `{"userOnly": false}`，走**全量差分**这条老路径。
+ * `userOnly` 本身的行为由 `verify-useronly.mjs` 专门覆盖。
+ *
  * @param tag - 隔离目录后缀
+ * @param cfg - 追加进 config.json 的字段（默认 { userOnly: false }）
  * @returns 清理函数
  */
-export async function prepareState(isolateFn, tag) {
+export async function prepareState(isolateFn, tag, cfg) {
   const { mkdirSync, writeFileSync } = await import('node:fs')
   const { join } = await import('node:path')
   const cleanup = isolateFn(tag)
   mkdirSync(join(process.env.DSH_HOME, 'webin', 'auth'), { recursive: true })
+  writeFileSync(
+    join(process.env.DSH_HOME, 'webin', 'config.json'),
+    JSON.stringify({ userOnly: false, ...(cfg ?? {}) }),
+    'utf8',
+  )
   for (const platform of ['deepseek', 'qwen']) {
     writeFileSync(
       join(process.env.DSH_HOME, 'webin', 'auth', `${platform}.json`),

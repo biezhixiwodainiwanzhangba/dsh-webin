@@ -29,7 +29,7 @@
 import type { Provider } from '../shared/providers'
 import { DEFAULT_PROVIDER_ID, ProviderRegistry } from '../shared/providers'
 import { buildToolSection, parseToolCalls, type ToolSchema } from './tool-protocol'
-import { serializeMessages, type DshMessage } from './serialize'
+import { contentToText, normalizeNewlines, serializeMessages, type DshMessage } from './serialize'
 import { DEFAULT_CONFIG, type WebinConfig } from '../shared/config'
 
 /** 路由名前缀：最终路由名 = `${ROUTE_PREFIX}-${provider.id}`。 */
@@ -719,6 +719,13 @@ function diffPrompt(options: {
   toolSection?: string
   /** 工具结果截断上限（用户可在设置页调）。 */
   toolResultLimit?: number
+  /**
+   * **只发用户原话**（设置页「只发我的原话」，默认开）。
+   *
+   * 打开后这条路径**完全不看** system / toolSection / 历史：
+   * 取最后一条 role: 'user' 消息的纯文本，原样返回。
+   */
+  userOnly?: boolean
 }): {
   text: string
   note: string
@@ -751,6 +758,53 @@ function diffPrompt(options: {
     while (start < messages.length && messages[start]!.role === 'assistant') {
       start += 1
       skippedOwnReply += 1
+    }
+  }
+
+  /**
+   * ## ⭐⭐ 只发用户原话（默认开）
+   *
+   * 用户原话：
+   *
+   * > 把我输入的生成一首诗直接输入进去不就行了，为什么每次都要接一堆额外的提示词？
+   *
+   * 之前首轮会把「系统提示词（约 6k 字符）+ 工具协议目录（约 5k）+ 全部历史」
+   * 一起塞进网页输入框：页面上那一大坨用户看得见，模型还会被它带跑
+   * （实测「生成一首诗」被答成历史里的「分入保险」）。
+   *
+   * 这里直接短路：**只取最后一条 user 消息的原文**，一字不加。
+   * 网页端于是等价于「用户自己打了这句话」。
+   *
+   * 取不到 user 文本（空内容 / 纯图片）时**照旧走全量路径** ——
+   * 宁可多带，也不能发空消息。
+   */
+  if (options.userOnly === true) {
+    let lastUser: DshMessage | undefined
+    for (let i = messages.length - 1; i >= 0; i -= 1) {
+      const m = messages[i]
+      if (m !== undefined && m.role === 'user') {
+        lastUser = m
+        break
+      }
+    }
+    const raw =
+      lastUser === undefined ? '' : normalizeNewlines(contentToText(lastUser.content)).trim()
+    if (raw !== '') {
+      return {
+        text: raw,
+        isFirst,
+        skippedOwnReply,
+        chatUrl: prev?.chatUrl,
+        commit: () => {
+          cursors.set(platform, sessionKey, {
+            sentCount: messages.length,
+            systemFingerprint: fp,
+            at: Date.now(),
+            ...(prev?.chatUrl === undefined ? {} : { chatUrl: prev.chatUrl }),
+          })
+        },
+        note: `只发用户原话 ${raw.length} 字符（不带系统提示词/工具目录/历史）`,
+      }
     }
   }
 
@@ -825,6 +879,11 @@ export interface AdapterDeps {
    * 未注入时**一律视为已登录** —— 测试与降级路径不该被门禁挡住；
    * 真门禁由 host 注入（它才知道快照在哪）。
    */
+  /**
+   * 是否把模型列进选择器（默认由 host 传，缺省 = 列）。
+   * 见 `WebinConfig.exposeModelsInPicker` —— 用户要求只开面板、不列模型。
+   */
+  exposeModels?: () => boolean
   isLoggedIn?: (platform: string) => boolean
   /**
    * ⭐ 宿主能力（host 注入）——用来把“无人领活”说到底。
@@ -1084,20 +1143,20 @@ export function createAdapter(deps: AdapterDeps) {
          */
         const noBridge = deps.hostCapability?.() === 'no-desktop-bridge'
         const reason = noBridge
-          ? '宿主无桌面浏览器通道：当前环境下 LDW 无法工作。'
-          : 'LDW 面板未连接：没有 client 领取这个任务。'
+          ? '宿主没有桌面浏览器通道：当前环境下网页版对话用不了。'
+          : '「网页版对话」面板没连上：没有客户端领取这个任务。'
         queue.settle(job.id, { error: reason })
         throw new Error(
           noBridge
-            ? '当前宿主没有桌面浏览器通道 —— LDW 只能在带 Electron 通道的官方 Desktop 版 DSH 里使用。\n' +
+            ? '当前宿主没有桌面浏览器通道 —— 网页版对话只能在带 Electron 通道的官方 Desktop 版 DSH 里使用。\n' +
               '现在这个环境（例如 DSH-X 启动器 + 浏览器 Web GUI、或第三方 Electron 壳）\n' +
               '不会提供 globalThis.dshDesktop，因此面板拿不到浏览器。\n' +
               '这不是“标签没打开”，切标签或重登录都不会好。\n' +
               '解法：换用官方 Desktop 版 DSH（它会注入该通道）。'
-            : 'LDW 面板未连接 —— 没有任何客户端领取这个任务（' +
+            : '「网页版对话」面板没连上 —— 没有任何客户端领取这个任务（' +
               `${Math.round(claimGraceMs / 1000)}s 内无人领取）。\n` +
-              '原因通常是：LDW 标签没打开、面板被切走卸载了、或页面还没登录。\n' +
-              '请切到 LDW 标签并确认显示「真实浏览器已就绪」。',
+              '原因通常是：「网页版对话」标签没打开、面板被切走卸载了、或页面还没登录。\n' +
+              '请切到「网页版对话」标签并确认显示「真实浏览器已就绪」。',
         )
       }
 
@@ -1105,7 +1164,7 @@ export function createAdapter(deps: AdapterDeps) {
         queue.settle(job.id, { error: '等待网页回复超时' })
         throw new Error(
           '等待网页回复超时。可能原因：页面结构变了 / 未登录 / 网页版没吐回复。' +
-            '请打开 LDW 标签查看页面状态。',
+            '请打开「网页版对话」标签查看页面状态。',
         )
       }
       await new Promise((r) => setTimeout(r, pollMs))
@@ -1169,7 +1228,7 @@ export function createAdapter(deps: AdapterDeps) {
           failure: {
             code: 'WEBIN_COMPACTION_UNSUPPORTED',
             message:
-              '压缩摘要不能走 LDW 网页版：摘要输入体量远超网页输入框上限，且会把整轮对话锁在浏览器上。' +
+              '压缩摘要不能走网页版对话：摘要输入体量远超网页输入框上限，且会把整轮对话锁在浏览器上。' +
               '请把 compaction-basic 的 summarizationProvider / summarizationModel ' +
               '配成普通 HTTP provider（例如 wb-out / deepseek-v4.1-flash）。',
           },
@@ -1199,7 +1258,7 @@ export function createAdapter(deps: AdapterDeps) {
             code: 'WEBIN_NOT_LOGGED_IN',
             message:
               `平台「${provider.name}」还没有登录，无法使用它的模型。\n` +
-              '请点输入框左边的「LDW」按钮（或切到 LDW 标签），' +
+              '请点输入框左边的「网页版对话」按钮（或切到该标签），' +
               `在打开的浏览器里登录 ${provider.homeUrl} 后重试。`,
           },
         },
@@ -1237,6 +1296,7 @@ export function createAdapter(deps: AdapterDeps) {
       cursors,
       toolSection,
       toolResultLimit: cfg.toolResultLimit,
+      userOnly: cfg.userOnly,
     })
     const prompt = diff.text
 
@@ -1603,6 +1663,18 @@ export function createAdapter(deps: AdapterDeps) {
      * 否则重启 DSH 后、用户还没切到 LDW 标签时模型会消失，看起来像插件坏了。
      */
     listModels(provider: string) {
+      /**
+       * ## 模型选择器开关（默认关）
+       *
+       * 用户原话：「不要在模型选择里显示乱七八糟的东西，我最开始的要求
+       * 只要能打开其他 ai 的对话窗口就够了」。
+       *
+       * 返回空数组 ⇒ DSH 的模型选择器整组不渲染（它按
+       * `group.models.length > 0` 过滤）。而 `resolveModel` / `prepareCall`
+       * 不受影响 —— 老会话里存着的 webin-* 模型仍能继续跑，不会因为
+       * 关掉展示而中断。
+       */
+      if (deps.exposeModels !== undefined && deps.exposeModels() === false) return Promise.resolve([])
       const hit = registry.all().find((p) => routeFor(p.id) === provider)
       if (hit === undefined) return Promise.resolve([])
       if (!loggedIn(hit.id)) {

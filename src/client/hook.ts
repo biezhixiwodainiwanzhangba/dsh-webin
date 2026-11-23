@@ -2030,6 +2030,26 @@ export function buildScrapeScript(): string {
        * 必须提醒用户并重试，而不是把半截内容当成功交付。
        */
       serverError: readServerError(),
+      /**
+       * ⭐⭐⭐ 主内容区**整段文本快照** —— 交付判据用它做「增量差分」。
+       *
+       * ## 为什么必须单独给一份（真实事故：把上一条历史回复当本轮结果交付）
+       *
+       * 豆包（doubao.com）的 DOM 全是 Tailwind 工具类 + 哈希后缀
+       * （实测：flex / min-w-0 / content-cjRQVY / panel-fvxXfj），
+       * 连 DeepSeek 那套 ds-* 类名都没有 —— 所以 CANDIDATES 全 0 命中，
+       * 必然落到 longest-div 兜底，兜底抓到的是**整个对话容器**
+       * （实测 1106 字符：一条 2025-02-28 的历史回复）。
+       *
+       * 于是 last 在这种平台上**不是「本轮回复」**，而是「整段历史」。
+       * 靠它比对内容变化 ⇒ 一有风吹草动就把历史当新回复交出去。
+       *
+       * 正确做法：发送前后各取一份**整段文本**，交付时只交**增量**
+       * （见 client 侧 stripEcho）。类名怎么改都不影响这个判据。
+       */
+      page: (function () {
+        try { return tidy(render(root)); } catch (e) { return ''; }
+      })(),
       /** 全部候选；**最后一条**是最新一轮的回复。 */
       all: list,
       last: list.length > 0 ? list[list.length - 1] : '',

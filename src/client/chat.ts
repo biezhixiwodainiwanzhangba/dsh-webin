@@ -57,6 +57,128 @@ export interface SendHints {
 }
 
 /**
+ * ## 验证墙（人机校验 / 滑块 / 图片拖拽）检测助手
+ *
+ * ## 为什么要它
+ *
+ * 站点在有可疑流量时会弹「请选择所有符合上文描述的图片，并拖拽到下方」
+ * 这类验证墙。此时**输入框照样被清空** ⇒ 原来「输入框被清空 = 发送成功」
+ * 的判据会把验证墙当成发送成功，然后一路等一个永远不来的回复
+ * （用户实测：bar 显示「已发送，等待页面回复 · 收到 0 条」，干等 10 分钟）。
+ *
+ * 检测出来只做一件事：**立刻失败**，把「去面板人工过验证」告诉用户，
+ * 而不是继续等。识别本身不做任何自动破解 —— 拖拽选图无法可靠自动化，
+ * 硬碰只会让风控更严。
+ *
+ * ## 判据（两档，都要求「够大的可见元素」）
+ *
+ *   1. **强特征**：容器 class/id/src 里写着 `captcha` / `geetest` /
+ *      `slide-verify` / `verify-panel` / `nc-container` / `yidun` 等
+ *   2. **文案**：弹层/浮层容器里的文字命中「请选择所有符合」「拖拽到下方」
+ *      「拖动滑块」「安全验证」等
+ *
+ * 只看「够大的可见元素」（≥200×90），否则页面上的小图标/文案会误判。
+ *
+ * 这段被拼进三个脚本（填充、触发、独立轻量检查）。
+ *
+ * ⚠️ 三处**各内联一份**（标记 `WALL-HELPER:BEGIN/END`），不用模块级常量：
+ * 本仓库的 `scripts/verify-scripts-parse.mjs` 会把 `build*Script` 的**函数体
+ * 单独抠出来 eval**，函数体一旦引用外部标识符就会 `ReferenceError`。
+ * 三份是否漂移由 `scripts/verify-wall.mjs` 断言（逐字节比较）。
+ */
+
+/**
+ * ## 轻量版：只回答「现在页面是不是被验证墙挡住了」
+ *
+ * 客户端等回复的循环每 6 秒调一次 —— 一旦为 true 就**立刻**把任务判失败，
+ * 让用户去面板人工过验证，而不是按 `replyTimeoutMs`（默认 10 分钟）干等。
+ * 调用方用 `execJs(..., 5_000)`，页面导航时靠超时兜住。
+ */
+export function buildWallCheckScript(): string {
+  return `(function () {
+/* WALL-HELPER:BEGIN */
+  /** 页面是否被验证墙挡住；返回 null 或 { kind, text, w, h }。 */
+  function wall() {
+    try {
+      /**
+       * ① 强特征：属性里带 captcha/verify 的容器。
+       * 用属性选择器让浏览器自己筛 —— 全页遍历 div 太慢（轮询会拖死 tick）。
+       */
+      var strong = document.querySelectorAll(
+        '[class*="captcha"],[id*="captcha"],[class*="verify"],[id*="verify"],' +
+        '[class*="geetest"],[id*="geetest"],[class*="slide-verify"],' +
+        '[class*="verify-"],[class*="nc-container"],[class*="yidun"],' +
+        '[class*="tcaptcha"],[class*="smartcaptcha"],' +
+        'iframe[src*="captcha"],iframe[src*="verify"]'
+      );
+      var i, n, r, t;
+      for (i = 0; i < strong.length; i++) {
+        n = strong[i];
+        if (!visible(n)) continue;
+        try { r = n.getBoundingClientRect(); } catch (e) { continue; }
+        if (!(r.width >= 200 && r.height >= 90)) continue;
+        t = String(n.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
+        return { kind: 'selector', text: t, w: Math.round(r.width), h: Math.round(r.height) };
+      }
+
+      /** ② 文案：弹层/浮层里写着验证引导语。 */
+      var KW = /请选择所有符合|拖拽到下方|拖拽到这里|拖动滑块|滑动验证|安全验证|人机验证|完成验证/;
+      var overlays = document.querySelectorAll(
+        '[role="dialog"],dialog,[class*="modal"],[class*="dialog"],' +
+        '[class*="popup"],[class*="overlay"],[class*="mask"]'
+      );
+      for (i = 0; i < overlays.length; i++) {
+        n = overlays[i];
+        if (!visible(n)) continue;
+        try { r = n.getBoundingClientRect(); } catch (e) { continue; }
+        if (!(r.width >= 200 && r.height >= 90)) continue;
+        try { t = String(n.innerText || n.textContent || '').replace(/\\s+/g, ' ').trim(); } catch (e) { continue; }
+        if (t.length === 0 || t.length > 800) continue;
+        if (KW.test(t)) return { kind: 'text', text: t.slice(0, 80), w: Math.round(r.width), h: Math.round(r.height) };
+      }
+    } catch (e) { /* 检测失败绝不能影响发送 */ }
+    return null;
+  }/* WALL-HELPER:END */
+  try {
+    var w = wall();
+    return JSON.stringify({ wall: w !== null, info: w, url: location.href });
+  } catch (e) {
+    return JSON.stringify({ wall: false, info: null, url: '' });
+  }
+})();`
+}
+
+/**
+ * ## 验证墙（人机校验 / 滑块 / 图片拖拽）检测助手
+ *
+ * ## 为什么要它
+ *
+ * 站点在有可疑流量时会弹「请选择所有符合上文描述的图片，并拖拽到下方」
+ * 这类验证墙。此时**输入框照样被清空** ⇒ 原来「输入框被清空 = 发送成功」
+ * 的判据会把验证墙当成发送成功，然后一路等一个永远不来的回复
+ * （用户实测：bar 显示「已发送，等待页面回复 · 收到 0 条」，干等 10 分钟）。
+ *
+ * 检测出来只做一件事：**立刻失败**，把「去面板人工过验证」告诉用户，
+ * 而不是继续等。识别本身不做任何自动破解 —— 拖拽选图无法可靠自动化，
+ * 硬碰只会让风控更严。
+ *
+ * ## 判据（两档，都要求「够大的可见元素」）
+ *
+ *   1. **强特征**：容器 class/id/src 里写着 `captcha` / `geetest` /
+ *      `slide-verify` / `verify-panel` / `nc-container` / `yidun` 等
+ *   2. **文案**：弹层/浮层容器里的文字命中「请选择所有符合」「拖拽到下方」
+ *      「拖动滑块」「安全验证」等
+ *
+ * 只看「够大的可见元素」（≥200×90），否则页面上的小图标/文案会误判。
+ *
+ * 这段被拼进三个脚本（填充、触发、独立轻量检查）。
+ *
+ * ⚠️ 三处**各内联一份**（标记 `WALL-HELPER:BEGIN/END`），不用模块级常量：
+ * 本仓库的 `scripts/verify-scripts-parse.mjs` 会把 `build*Script` 的**函数体
+ * 单独抠出来 eval**，函数体一旦引用外部标识符就会 `ReferenceError`。
+ * 三份是否漂移由 `scripts/verify-wall.mjs` 断言（逐字节比较）。
+ */
+/**
  * ## 填充输入框（**短调用，快速返回**）
  *
  * 与 `buildTriggerScript` 配合使用，中间由客户端控制随机延迟。
@@ -72,9 +194,52 @@ export function buildFillScript(text: string, hints?: SendHints): string {
     '[role="textbox"]',
   ]
 
-  return `(function () {
+  return `(async function () {
   var TEXT = ${JSON.stringify(text)};
   var INPUT_SELECTORS = ${JSON.stringify(inputSelectors)};
+/* WALL-HELPER:BEGIN */
+  /** 页面是否被验证墙挡住；返回 null 或 { kind, text, w, h }。 */
+  function wall() {
+    try {
+      /**
+       * ① 强特征：属性里带 captcha/verify 的容器。
+       * 用属性选择器让浏览器自己筛 —— 全页遍历 div 太慢（轮询会拖死 tick）。
+       */
+      var strong = document.querySelectorAll(
+        '[class*="captcha"],[id*="captcha"],[class*="verify"],[id*="verify"],' +
+        '[class*="geetest"],[id*="geetest"],[class*="slide-verify"],' +
+        '[class*="verify-"],[class*="nc-container"],[class*="yidun"],' +
+        '[class*="tcaptcha"],[class*="smartcaptcha"],' +
+        'iframe[src*="captcha"],iframe[src*="verify"]'
+      );
+      var i, n, r, t;
+      for (i = 0; i < strong.length; i++) {
+        n = strong[i];
+        if (!visible(n)) continue;
+        try { r = n.getBoundingClientRect(); } catch (e) { continue; }
+        if (!(r.width >= 200 && r.height >= 90)) continue;
+        t = String(n.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
+        return { kind: 'selector', text: t, w: Math.round(r.width), h: Math.round(r.height) };
+      }
+
+      /** ② 文案：弹层/浮层里写着验证引导语。 */
+      var KW = /请选择所有符合|拖拽到下方|拖拽到这里|拖动滑块|滑动验证|安全验证|人机验证|完成验证/;
+      var overlays = document.querySelectorAll(
+        '[role="dialog"],dialog,[class*="modal"],[class*="dialog"],' +
+        '[class*="popup"],[class*="overlay"],[class*="mask"]'
+      );
+      for (i = 0; i < overlays.length; i++) {
+        n = overlays[i];
+        if (!visible(n)) continue;
+        try { r = n.getBoundingClientRect(); } catch (e) { continue; }
+        if (!(r.width >= 200 && r.height >= 90)) continue;
+        try { t = String(n.innerText || n.textContent || '').replace(/\\s+/g, ' ').trim(); } catch (e) { continue; }
+        if (t.length === 0 || t.length > 800) continue;
+        if (KW.test(t)) return { kind: 'text', text: t.slice(0, 80), w: Math.round(r.width), h: Math.round(r.height) };
+      }
+    } catch (e) { /* 检测失败绝不能影响发送 */ }
+    return null;
+  }/* WALL-HELPER:END */
 
   function visible(el) {
     if (!el) return false;
@@ -165,7 +330,110 @@ export function buildFillScript(text: string, hints?: SendHints): string {
     return { ok: false, how: 'unsupported-element' };
   }
 
+  /* ───────────────────────── 拟人键入 ───────────────────────── */
+
+  function sleep(ms) {
+    return new Promise(function (r) { setTimeout(r, Math.max(0, ms)); });
+  }
+
+  /** 只改值、不派发事件（键入时每个字符单独走一次）。 */
+  function nativeSet(el, value) {
+    if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') {
+      var proto = el.tagName === 'TEXTAREA' ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+      var desc = Object.getOwnPropertyDescriptor(proto, 'value');
+      if (desc && desc.set) desc.set.call(el, value);
+      else el.value = value;
+      return;
+    }
+    el.textContent = value;
+  }
+
+  /** 合成一次按键（keydown / keypress / keyup）。 */
+  function fireKey(el, type, ch) {
+    var isEnter = ch === '\\n';
+    var key = isEnter ? 'Enter' : ch;
+    var code = isEnter ? 'Enter'
+      : (ch === ' ' ? 'Space'
+        : (/[a-zA-Z]/.test(ch) ? 'Key' + ch.toUpperCase()
+          : (/[0-9]/.test(ch) ? 'Digit' + ch : '')));
+    var vk = isEnter ? 13
+      : (ch === ' ' ? 32
+        : (/[a-zA-Z0-9]/.test(ch) ? ch.toUpperCase().charCodeAt(0) : 0));
+    try {
+      el.dispatchEvent(new KeyboardEvent(type, {
+        key: key, code: code, keyCode: vk, which: vk,
+        bubbles: true, cancelable: true, composed: true,
+        isComposing: false,
+      }));
+    } catch (e) { /* 合成事件失败不影响后续输入 */ }
+  }
+
+  /**
+   * ## 逐字键入（**拟人输入**）
+   *
+   * ## 为什么不能一次性赋值
+   *
+   * 一次性「value = 全部文本」+ 一个「input」事件，在站点风控眼里是**零成本**的：
+   * 没有 keydown/keyup 序列、没有 keypress 时序、没有字符间隔 —— 和复制粘贴
+   * 一模一样，而且粘贴通常还带 paste 事件。豆包第一次发送就弹了图片拖拽
+   * 验证墙（用户实测）。
+   *
+   * 现在：**每个字符**都走 keydown → beforeinput → set → input → keyup，
+   * 字符之间有 5–90ms 的随机间隔（总预算 ~2.2 秒，与真实打字同量级）。
+   *
+   * ⚠️ 长文本（> MAX_TYPED 字符）不逐字打 —— 几千字符要几十秒，
+   * 早就超过调用方的 30s 超时。那时退回一次性 setText（长 prompt 本来也
+   * 更容易被当成「长文粘贴」而被风控记住，逐字打并不能救）。
+   */
+  var MAX_TYPED = 400;
+
+  async function typeHuman(el, value) {
+    value = toLf(value);
+    el.focus();
+    /** 先清空（同样走 setter + input，而不是直接改 DOM）。 */
+    nativeSet(el, '');
+    try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
+
+    var per = value.length > 0 ? Math.min(90, Math.max(5, Math.floor(2200 / value.length))) : 0;
+    var acc = '';
+    for (var i = 0; i < value.length; i++) {
+      var ch = value.charAt(i);
+      fireKey(el, 'keydown', ch);
+      try {
+        el.dispatchEvent(new InputEvent('beforeinput', {
+          bubbles: true, cancelable: true, inputType: 'insertText', data: ch,
+        }));
+      } catch (e) {}
+      acc += ch;
+      nativeSet(el, acc);
+      try {
+        el.dispatchEvent(new InputEvent('input', {
+          bubbles: true, cancelable: false, inputType: 'insertText', data: ch,
+        }));
+      } catch (e) {}
+      fireKey(el, 'keyup', ch);
+      if (per > 0) await sleep(per - per * 0.4 * Math.random());
+    }
+    try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
+
+    var got = readInput(el);
+    if (got.trim() === '') return { ok: false, how: 'human-typed-noop' };
+    return { ok: true, how: got === value ? 'human-typed' : 'human-typed-partial' };
+  }
+
   try {
+    /**
+     * ⭐ 先看有没有验证墙 —— 有的话连填字都别填（风控正在拦，填了也发不出去）。
+     */
+    var blocked = wall();
+    if (blocked !== null) {
+      return JSON.stringify({
+        ok: false, stage: 'captcha', blocked: 'captcha',
+        message: '页面出现验证墙（' + (blocked.text || '人机校验') + '）—— 需要人工在「网页版对话」标签里完成验证后再重试',
+        wall: blocked, url: location.href,
+      });
+    }
+
     /** 收集候选（依次试，见原实现的说明）。 */
     var cands = [];
     var seen = [];
@@ -197,8 +465,19 @@ export function buildFillScript(text: string, hints?: SendHints): string {
 
     var tried = [];
     for (var c = 0; c < cands.length; c++) {
-      var attempt = setText(cands[c].el, TEXT);
-      tried.push({ how: cands[c].how, tag: cands[c].el.tagName, result: attempt.how });
+      var node = cands[c].el;
+      var attempt;
+      /**
+       * ⭐ textarea/input 走**逐字键入**（拟人）；逐字打失败再退回一次性赋值。
+       * contenteditable 仍走 paste（站点对它的处理就是粘贴，逐字打也进不去）。
+       */
+      if ((node.tagName === 'TEXTAREA' || node.tagName === 'INPUT') && TEXT.length <= MAX_TYPED) {
+        attempt = await typeHuman(node, TEXT);
+      } else {
+        attempt = setText(node, TEXT);
+        if (node.tagName === 'TEXTAREA' || node.tagName === 'INPUT') attempt.how += '+typed-skipped(long-or-fallback)';
+      }
+      tried.push({ how: cands[c].how, tag: node.tagName, result: attempt.how });
       if (!attempt.ok) continue;
       if (readInput(cands[c].el).trim().length === 0) {
         tried[tried.length - 1].result += '+empty-after-fill';
@@ -277,7 +556,49 @@ export function buildTriggerScript(hints?: SendHints, expectText?: string): stri
    * 空串表示不做这个校验（调用方没传）。
    */
   var EXPECT = ${JSON.stringify(expectText ?? '')};
+/* WALL-HELPER:BEGIN */
+  /** 页面是否被验证墙挡住；返回 null 或 { kind, text, w, h }。 */
+  function wall() {
+    try {
+      /**
+       * ① 强特征：属性里带 captcha/verify 的容器。
+       * 用属性选择器让浏览器自己筛 —— 全页遍历 div 太慢（轮询会拖死 tick）。
+       */
+      var strong = document.querySelectorAll(
+        '[class*="captcha"],[id*="captcha"],[class*="verify"],[id*="verify"],' +
+        '[class*="geetest"],[id*="geetest"],[class*="slide-verify"],' +
+        '[class*="verify-"],[class*="nc-container"],[class*="yidun"],' +
+        '[class*="tcaptcha"],[class*="smartcaptcha"],' +
+        'iframe[src*="captcha"],iframe[src*="verify"]'
+      );
+      var i, n, r, t;
+      for (i = 0; i < strong.length; i++) {
+        n = strong[i];
+        if (!visible(n)) continue;
+        try { r = n.getBoundingClientRect(); } catch (e) { continue; }
+        if (!(r.width >= 200 && r.height >= 90)) continue;
+        t = String(n.textContent || '').replace(/\\s+/g, ' ').trim().slice(0, 80);
+        return { kind: 'selector', text: t, w: Math.round(r.width), h: Math.round(r.height) };
+      }
 
+      /** ② 文案：弹层/浮层里写着验证引导语。 */
+      var KW = /请选择所有符合|拖拽到下方|拖拽到这里|拖动滑块|滑动验证|安全验证|人机验证|完成验证/;
+      var overlays = document.querySelectorAll(
+        '[role="dialog"],dialog,[class*="modal"],[class*="dialog"],' +
+        '[class*="popup"],[class*="overlay"],[class*="mask"]'
+      );
+      for (i = 0; i < overlays.length; i++) {
+        n = overlays[i];
+        if (!visible(n)) continue;
+        try { r = n.getBoundingClientRect(); } catch (e) { continue; }
+        if (!(r.width >= 200 && r.height >= 90)) continue;
+        try { t = String(n.innerText || n.textContent || '').replace(/\\s+/g, ' ').trim(); } catch (e) { continue; }
+        if (t.length === 0 || t.length > 800) continue;
+        if (KW.test(t)) return { kind: 'text', text: t.slice(0, 80), w: Math.round(r.width), h: Math.round(r.height) };
+      }
+    } catch (e) { /* 检测失败绝不能影响发送 */ }
+    return null;
+  }/* WALL-HELPER:END */
   /**
    * 归一化后比较（换行 / 首尾空白 / 中间的连续空白都不该导致误判）。
    * 只比较**前 200 字符** —— 长 prompt 尾部可能被输入框截断显示，
@@ -391,6 +712,19 @@ export function buildTriggerScript(hints?: SendHints, expectText?: string): stri
   }
 
   try {
+    /**
+     * ⭐ 点火前先看验证墙：风控正在拦时按发送只会让情况更糟（且必然发不出去）。
+     * 直接带着可操作的信息返回，让用户去面板人工过验证。
+     */
+    var wallNow = wall();
+    if (wallNow !== null) {
+      return JSON.stringify({
+        ok: false, stage: 'captcha', reason: 'captcha', confirmed: false,
+        message: '页面出现验证墙（' + (wallNow.text || '人机校验') + '）—— 消息没有发出去，需要人工在面板里完成验证',
+        wall: wallNow, url: location.href,
+      });
+    }
+
     var input = findInput();
     if (!input) return JSON.stringify({ ok: false, message: '触发时找不到输入框', url: location.href });
 
@@ -560,6 +894,25 @@ export function buildTriggerScript(hints?: SendHints, expectText?: string): stri
       }
       function probe() {
         tries++;
+        /**
+         * ## ⭐⭐ 验证墙闸门（用户实测的坑）
+         *
+         * 点发送之后页面弹人机校验时，**输入框同样会被清空** ⇒ 下面的
+         * 「输入框空了 = 页面接受了」判据会误判成功，于是插件一路等一个
+         * 永远不来的回复（实测干等 10 分钟，bar 停在「收到 0 条」）。
+         *
+         * 所以每一轮探测都先看墙：一旦命中就**立刻**带着 captcha 判失败。
+         */
+        var wallNow2 = wall();
+        if (wallNow2 !== null) {
+          resolve(JSON.stringify({
+            ok: false, stage: 'captcha', reason: 'captcha', confirmed: false,
+            how: how, method: method,
+            message: '点发送后页面弹出验证墙（' + (wallNow2.text || '人机校验') + '）—— 消息没有发出去，需要人工在面板里完成验证',
+            wall: wallNow2, url: location.href,
+          }));
+          return;
+        }
         /**
          * ⭐ **重新找输入框** —— 不能复用点击前抓的引用（它可能已被摘除）。
          */

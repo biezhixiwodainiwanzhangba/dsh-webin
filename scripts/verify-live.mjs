@@ -143,7 +143,15 @@ console.log('\n[3] ⭐⭐⭐ 领活过滤方向：以「窗口是否上报」为
 console.log('\n[4] ⭐⭐ 发送确认必须重新找输入框（不能读摘除节点）')
 {
   const chatSrc = readFileSync(join(ROOT, 'src', 'client', 'chat.ts'), 'utf8')
-  check('⭐⭐ 探测里重新 findInput', /function probe\(\) \{[\s\S]{0,300}?var fresh = findInput\(\)/.test(chatSrc), true)
+  /**
+   * ⚠️ 窗口从 300 放宽到 3000：探测里现在先跑一道验证墙闸门（10 行左右），
+   * 300 字符根本到不了 findInput —— 断言会假红，看起来像「没重找输入框」。
+   */
+  check(
+    '⭐⭐ 探测里重新 findInput',
+    /function probe\(\) \{[\s\S]{0,3000}?var fresh = findInput\(\)/.test(chatSrc),
+    true,
+  )
   check('⭐ 用 fresh 而不是旧引用', /var now = readInput\(fresh\)/.test(chatSrc), true)
   check('⭐ 产物里也有', /var fresh = findInput\(\)/.test(clientBundle), true)
 }
@@ -612,7 +620,12 @@ console.log('\n[15] ⭐⭐⭐ 交付判据不许有长度门槛（第二处残�
     clientSrc.includes('last.length >= 8 && (countGrew'),
     false,
   )
-  check('⭐⭐ 交付只要求非空', /last\.length > 0 && \(countGrew/.test(clientSrc), true)
+  /**
+   * ⚠️ 判据升级了（见 verify-delta）：不再单看「条数增长」，而是
+   * 「增量差分成功」或「精确选择器下条数/内容变化」—— 历史正文进不来。
+   */
+  check('⭐⭐ 交付只要求非空', /lastClean\.length > 0 && historySafe/.test(clientSrc), true)
+  check('⭐⭐ 有 historySafe 收口', /const historySafe = deltaUsed \|\|/.test(clientSrc), true)
   check('⭐⭐ 产物同步', cb.includes('last.length >= 8&&(countGrew') || cb.includes('last.length>=8&&(countGrew'), false)
   /** 教训注释要在。 */
   check('⭐ 事故记录在注释里', /第二处残留/.test(clientSrc), true)

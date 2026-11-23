@@ -5,7 +5,8 @@
  * ## 用户的两条要求
  *
  * 1. 「每次新建会话的时候，应该在这里加个 LDW，让登录一下」
- *    → `conversation.input.left` 注册一个入口按钮（新建会话也在视野里）
+ *    → 早期是 `conversation.input.left` 的入口按钮；m02553 起搬进输入框「+」菜单
+ *      （宿主 commandUi 客户端贡献，见 verify-command-menu.mjs）
  * 2. 「如果是已登录才能使用 LDW 那俩模型」
  *    → 未登录的平台**不列出模型**，且**调用时直接报错**
  *
@@ -22,7 +23,7 @@
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { isolate } from './lib/isolate.mjs'
+import { isolate, enableModelPicker } from './lib/isolate.mjs'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 
@@ -128,6 +129,8 @@ function writeSnapshot(platform, body) {
 console.log('=== 登录门禁 + 输入框 LDW 入口 测试 ===\n')
 
 const cleanupState = isolate('webin-login-gate')
+/** 默认关着模型展示；这里要验证 listModels 的真实清单。 */
+enableModelPicker()
 const mod = await import(pathToFileURL(join(ROOT, 'lib', 'index.js')).href)
 const { apply } = mod
 
@@ -230,7 +233,7 @@ console.log('\n[7] ⭐ 未登录时调用模型 → 明确报错（不是莫名�
   check('⭐ 以 error 结束', finish?.reason?.kind, 'error')
   check('⭐ 错误码 WEBIN_NOT_LOGGED_IN', finish?.reason?.failure?.code, 'WEBIN_NOT_LOGGED_IN')
   check('⭐ 提示里说了怎么登录', /登录/.test(finish?.reason?.failure?.message ?? ''), true)
-  check('⭐ 提示里提到 LDW 按钮或标签', /LDW/.test(finish?.reason?.failure?.message ?? ''), true)
+  check('⭐ 提示里提到「网页版对话」按钮或标签', /网页版对话/.test(finish?.reason?.failure?.message ?? ''), true)
   /** 不能真的派发任务（否则页面会跳登录页）。 */
   check('没有派发任务', chunks.some((c) => c.type === 'text-delta'), false)
 }
@@ -257,50 +260,38 @@ console.log('\n[9] GET /providers 也带 loggedInPlatforms（设置页要用）'
   check('有 loggedInPlatforms', Array.isArray(res.json?.loggedInPlatforms), true)
 }
 
-console.log('\n[10] ⭐ client 侧：输入框左侧注册了 LDW 入口')
+console.log('\n[10] ⭐ client 侧：入口在输入框「+」菜单里（不再占输入框左侧）')
 {
   const client = readFileSync(join(ROOT, 'lib', 'client.js'), 'utf8')
-  check('⭐ 注册了 conversation.input.left', client.includes('conversation.input.left'), true)
-  check('⭐ inject 了该 slot', /inject\("conversation\.input\.left"/.test(client), true)
-  check('⭐ register 带 name', /name:\s*"conversation\.input\.left"/.test(client), true)
-  check('id 是 ldw-login', /id:\s*"ldw-login"/.test(client), true)
-  /** 三个状态文案。 */
-  check('⭐ 显示「LDW 已登录」', client.includes('LDW 已登录'), true)
   /**
-   * ⚠️ 断言不能写死引号风格 —— 产物会把 `'x'` 压成 `"x"`。
-   * 所以用「双引号 + 后面紧跟冒号」这种**带上下文**的判据，
-   * 而不是裸的 `'LDW 登录'`（踩过）。
+   * m02553：「能移动到这个加号里面吗？能不能加各个模型的选项？」
+   * 「+」打开的就是斜杠命令菜单，宿主用 commandUi 合成候选 ⇒ 注册一条客户端贡献即可。
    */
-  check('⭐ 显示「LDW 登录」（未登录时催一下）', /"LDW 登录"/.test(client), true)
-  check('⭐ 显示「LDW 未就绪」（面板没起）', client.includes('LDW 未就绪'), true)
   /**
-   * ⭐ **有标签栏时不渲染**（用户明确要求「图2这个页面不用加LDW登录」）。
-   *
-   * 判据是 `hasTabs` 驱动 `return null` —— 标签栏存在说明用户能自己
-   * 点「LDW」标签，这个按钮就是冗余的。
+   * ⚠️ 产物里保留着源码注释（含 conversation.input.left 这串字），
+   * 所以判据必须看**注册三件套**，不是裸字符串。
    */
-  check('⭐ 有标签栏时隐藏按钮', /if \(hasTabs\) return null/.test(client), true)
-  check('⭐ 用 MutationObserver 盯标签栏出现', /new MutationObserver/.test(client), true)
-  /**
-   * ⭐ **点击打开设置页**（用户要求：「设置页面加个登录按钮，然后点击按钮
-   * 之后自动打开设置界面」）。
-   *
-   * 之前点击是「切到 LDW 标签」，在新会话空页面上必然失败 ——
-   * 因为标签栏是 `tabs.length > 1` 才渲染的。
-   */
-  check('⭐ 点击打开设置页', /openSettingsAtLdwSection/.test(client), true)
-  check('⭐ 找设置模态框（data-shortcut-modal）', client.includes('data-shortcut-modal'), true)
-  check('⭐ 按文字找设置按钮', /t === "设置"/.test(client) || /t === '设置'/.test(client), true)
-  check('⭐ 有快捷键兜底（Ctrl+,）', /code: "Comma"|code: 'Comma'/.test(client), true)
-  check('⭐ 切到 LDW 分区', /t\.includes\("ldw"\)|t\.includes\('ldw'\)/.test(client), true)
-  /** 失败要给**具体**原因，不是笼统一句。 */
-  check('⭐ 找不到设置按钮时给具体原因', /没找到设置按钮，也没唤出设置页/.test(client), true)
-  check('⭐ 没有 LDW 分区时给具体原因', /设置页里没有 LDW 分区/.test(client), true)
-  check('⭐ 用 rAF 等 React 提交（不是定时器轮询）', /requestAnimationFrame/.test(client), true)
-  check('⭐ 定期刷新登录态', /setInterval/.test(client), true)
-  /** 样式。 */
-  check('样式含 .ldw-entry', client.includes('.ldw-entry'), true)
-  check('⭐ 未登录时用警示色', /\.ldw-entry:has\(\.ldw-dot\.warn\)/.test(client), true)
+  check('⭐ 不再 inject conversation.input.left', /inject\("conversation\.input\.left"/.test(client), false)
+  check('⭐ 不再 register conversation.input.left', /name:\s*"conversation\.input\.left"/.test(client), false)
+  check('⭐ 不再导出 LdwLoginButton', client.includes('LdwLoginButton'), false)
+  check('⭐ 不再有「网页版对话未就绪」文案', client.includes('网页版对话未就绪'), false)
+  /** 作用域注入，不是顶层 inject —— 顶层写成硬依赖会把插件卡在 PENDING。 */
+  check('⭐ 作用域注入 commandUi', /inject\(\["commandUi"\]/.test(client), true)
+  check('⭐ 注册命令 webin', /name:\s*"webin"/.test(client), true)
+  check('⭐ 用 popupSelect 弹二级列表', /kind:\s*"popupSelect"/.test(client), true)
+  check('⭐ 模糊搜索平台与模型', /searchMode:\s*"fuzzy-label"/.test(client), true)
+  check('⭐ 行由 webinMenuRows 生成', client.includes('webinMenuRows'), true)
+  check('⭐ 行里有「打开网页版对话」', /打开网页版对话/.test(client), true)
+  check('⭐ 平台行前缀 platform:', client.includes('"platform:" + p.id') || client.includes("'platform:' + p.id"), true)
+  check('⭐ 模型行前缀 model:', client.includes('"model:" + p.id') || client.includes("'model:' + p.id"), true)
+  check('⭐ 面板动作桥 panelBridge', client.includes('panelBridge'), true)
+  check('⭐ 桥在卸载时摘掉', /panelBridge = null/.test(client), true)
+  check('⭐ 打开失败退回设置页', /openSettingsAtLdwSection/.test(client), true)
+  check('⭐ 切模型走 modelDirectories', client.includes('modelDirectories'), true)
+  check('⭐ 切模型失败不打断', /切换网页版模型失败/.test(client), true)
+  /** 命令贡献在插件作用域拿不到组件 state ⇒ 必须靠桥，不能直接 setPlatformId。 */
+  check('⭐ 桥里才改 platformId', /setPlatformId\(platformId\)/.test(client), true)
+  check('⭐ 宿主缺 commandUi 时只打日志', /宿主没有 commandUi 服务/.test(client), true)
 }
 
 console.log('\n[10b] ⭐ 设置页有登录按钮（用户要求的入口在这）')
@@ -328,8 +319,8 @@ console.log('\n[10b] ⭐ 设置页有登录按钮（用户要求的入口在这�
    * 所以判据不能写裸的 `[role="tab"]`（踩过）。用 `role=` + `tab` 两段找。
    */
   check('⭐ 兜底找 role=tab', /\[role=\\"tab\\"\]/.test(client), true)
-  /** ⚠️ 不能点到自己 —— 否则无限套娃。 */
-  check('⭐ 排除自己的按钮（防套娃）', /classList\.contains\("ldw-entry"\)/.test(client), true)
+  /** 输入框左侧那个按钮已撤掉，套娃判重也就不需要了。 */
+  check('⭐ 不再有套娃判重（入口已撤）', /ldw-entry/.test(client), false)
   /** 找不到时说明下一步做什么。 */
   check('⭐ 找不到标签时给下一步', /先发一条消息让会话建立/.test(client), true)
 }
@@ -367,7 +358,7 @@ console.log('\n[?] ⭐⭐⭐ 登录页的文字绝不能被当成回复交付')
 
   check('⭐⭐⭐ 有登录页 URL 判据', /sign\[_-\]\?in|sign\[_-\]\?up/.test(clientSrc), true)
   check('⭐⭐ 命中后拒绝交付抓取内容', /拒绝把页面文字当回复交付/.test(clientSrc), true)
-  check('⭐⭐ 改为明确报错', /页面已掉线到登录页/.test(clientSrc), true)
+  check('⭐⭐ 改为明确报错', /网页版对话已掉线到登录页/.test(clientSrc), true)
 }
 
 console.log(`\n=== 结果：${pass} 通过 / ${fail} 失败 ===`)

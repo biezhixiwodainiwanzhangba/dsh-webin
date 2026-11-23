@@ -53,7 +53,14 @@ const SRC = dirname(dirname(fileURLToPath(import.meta.url)))
 const DS_HOME = process.env.DSH_HOME ?? join(homedir(), '.dsh')
 const SNAPSHOT = join(DS_HOME, 'webin', 'auth', `${PLATFORM}.json`)
 
-const BASE = 'http://127.0.0.1:19387/dsh-webin/api'
+/**
+ * ⚠️ 端口可覆盖：这是**活体 E2E**，需要一个正在跑的 DSH 实例 + 真浏览器。
+ * 早期写死 19387（某个开发会话的端口），换台机器/换次启动就恒报
+ * `fetch failed` —— 看起来像插件坏了，实际是脚本连不上。
+ *
+ * 用法：\`DSH_WEBIN_BASE=http://127.0.0.1:57342/dsh-webin/api node scripts/verify-e2e.mjs\`
+ */
+const BASE = process.env.DSH_WEBIN_BASE ?? 'http://127.0.0.1:19387/dsh-webin/api'
 const SECRET = process.env.DSH_WEBIN_SECRET ?? ''
 
 const BROWSERS = [
@@ -437,7 +444,34 @@ async function main() {
   }
 }
 
-main().catch((e) => {
-  console.error('失败:', e?.message ?? e)
-  process.exitCode = 1
-})
+/**
+ * 活体 E2E 前置探活：连不上就 **SKIP**（不算失败）。
+ *
+ * ## 为什么
+ *
+ * 这套脚本要求「DSH 正在跑 + 浏览器可启 + 网页版已登录」，是**手动**验证工具。
+ * 以前它被并进全量扫描，环境不在时恒红 —— 于是真正的回归失败被这条噪音盖住。
+ * 现在明确区分：环境不在 ⇒ SKIP；连上了但断言不成立 ⇒ 真失败。
+ */
+async function preflight() {
+  try {
+    const res = await fetch(`${BASE}/version`)
+    return res.ok
+  } catch {
+    return false
+  }
+}
+
+preflight()
+  .then((alive) => {
+    if (!alive) {
+      console.log(`SKIP 连不上 ${BASE} —— 需要 DSH 在跑（DSH_WEBIN_BASE 可改地址）`)
+      console.log('     这是活体 E2E，属于手动验证工具，不计入自动化结果。')
+      return
+    }
+    return main()
+  })
+  .catch((e) => {
+    console.error('失败:', e?.message ?? e)
+    process.exitCode = 1
+  })

@@ -17,7 +17,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { EventEmitter } from 'node:events'
-import { isolate } from './lib/isolate.mjs'
+import { isolate, enableModelPicker } from './lib/isolate.mjs'
 
 const ROOT = dirname(dirname(fileURLToPath(import.meta.url)))
 const require = createRequire(import.meta.url)
@@ -147,6 +147,8 @@ console.log('=== dsh-webin host 半验证 ===\n')
  * 详见 `scripts/lib/isolate.mjs`。
  */
 const cleanupState = isolate('webin-host')
+/** 默认关着模型展示；这里要验证 listModels 的真实清单。 */
+enableModelPicker()
 
 /**
  * ⚠️ **必须写登录快照** —— 插件有登录门禁（用户要求「已登录才能用 LDW 模型」）：

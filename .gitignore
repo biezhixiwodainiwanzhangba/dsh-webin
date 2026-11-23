@@ -9,3 +9,10 @@ lib/*.map
 # 注意：lib/ 里的 .js **要**提交 —— package.json 的 files 含 lib、
 # main 指向 ./lib/index.js，装了插件才能跑。
 # 改了 src 记得 `npm run build` 后把 lib/*.js 一起提交。
+
+# 本地杂物（构建/回归产生的临时文件，别进仓库）
+*.bak-*
+run-all.out.txt
+verify-all.log
+_check_scripts.mjs
+pnpm-debug.log

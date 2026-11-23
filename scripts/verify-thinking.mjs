@@ -589,9 +589,14 @@ console.log('\n[?] ⭐⭐⭐ 思考剔除必须**两条交付路径共用同一�
     /stripThinkFromText\(replyRaw/.test(clientSrc),
     true,
   )
+  /**
+   * ⚠️ DOM 调用现在跨行（正文参数先算 deltaReply 再传），一字不差地匹配
+   * `stripThinkFromText(last, think, 'dom')` 会假红。这里按「参数里有 'dom'」
+   * 的跨行形态断言。
+   */
   check(
     '⭐⭐ DOM 路径也调它',
-    /stripThinkFromText\(last, think, 'dom'\)/.test(clientSrc),
+    /stripThinkFromText\([\s\S]{0,200}?'dom',\s*\)/.test(clientSrc),
     true,
   )
   /** 旧的内联实现必须消失 —— 否则又是两份判据。 */

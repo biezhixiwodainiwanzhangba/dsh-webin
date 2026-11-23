@@ -89,12 +89,16 @@ console.log('\n[3] ⭐⭐⭐ 早期放弃：发出后 30 秒页面没动静就�
    * 光靠 trigger 确认还不够（确认本身也可能被骗过）。所以再加一道：
    * **发出后 30 秒内页面上必须出现「正在生成」的迹象**。
    *
-   * 判据是「一点动静都没有」：
-   *   - 条数没增长
-   *   - 内容没变化
+   * 判据是「本轮**没有可交付的正文**」：
+   *   - `arrived` 为假（= 没有通过「历史安全闸」的正文，见 index.ts historySafe）
    *   - 连思考区都是空的
    *
-   * 三者都不成立才继续等 —— 正常生成中一定会命中至少一个。
+   * 两者同时成立才判失败 —— 正常生成中至少会命中一个。
+   *
+   * ⚠️ 早先用的是「条数没增长 && 内容没变化」。在豆包上 `contentChanged`
+   * 会因为兜底抓到**整段历史**而变真（历史上任何一点变化都算），于是
+   * 「一边说没到货、一边说可以交付」口径打架，用户被卡在中间。
+   * 所以判据统一到 `arrived` —— **与交付闸门同一个口径**。
    */
   /**
    * ⚠️ **不要钉死数值** —— 原来断言 `= 30_000`，而用户连续三轮被这个 30 秒误报，
@@ -105,13 +109,13 @@ console.log('\n[3] ⭐⭐⭐ 早期放弃：发出后 30 秒页面没动静就�
   check('⭐ 有 EARLY_GIVE_UP_MS 常量', m !== null, true)
   /** cuckoo 唯一的超时是 300 秒；我们保留这道判据，但至少不能比 60 秒更激进。 */
   check(`⭐ 窗口够保守（${ms}ms >= 60000）`, ms >= 60_000, true)
-  check('⭐ 判据含「条数没增长」', /!countGrew &&/.test(clientSrc), true)
-  check('⭐ 判据含「内容没变化」', /!contentChanged &&/.test(clientSrc), true)
+  check('⭐ 判据含「没有可交付正文」', /!arrived &&/.test(clientSrc), true)
+  check('⭐ 判据与交付闸门同口径', /const arrived = /.test(clientSrc) && /const historySafe = /.test(clientSrc), true)
   check('⭐ 判据含「思考区为空」', /think\.trim\(\) === ''/.test(clientSrc), true)
   /** ⭐ 两条「不许下结论」的否决 —— 用户三轮误报换来的。 */
   check('⭐⭐ 页面在生成时不许判失败', /generating !== true/.test(clientSrc), true)
   check('⭐⭐ 抓取看不见页面时不许判失败', /scrapedOk === true/.test(clientSrc), true)
-  check('⭐ 条件同时成立才放弃', /waitedMs > EARLY_GIVE_UP_MS &&[\s\S]{0,600}?!countGrew &&[\s\S]{0,200}?think\.trim\(\) === ''/.test(clientSrc), true)
+  check('⭐ 条件同时成立才放弃', /waitedMs > EARLY_GIVE_UP_MS &&[\s\S]{0,1200}?!arrived &&[\s\S]{0,400}?think\.trim\(\) === ''/.test(clientSrc), true)
   check('⭐ 放弃时交可照做的错误', /消息似乎没有发出去/.test(clientSrc), true)
   check('⭐ 放弃时清 pending', /clearPending\(\)[\s\S]{0,400}?消息似乎没有发出去/.test(clientSrc), true)
 
@@ -157,7 +161,7 @@ console.log('\n[6] ⭐ 错误信息都要「能照做」（用户看得到下一
   check('⭐ input-lost 说清了原因', /输入框里的内容在发送前丢失了/.test(clientSrc), true)
   check('⭐ input-lost 说清了动作', /消息没有发出去，请重试/.test(clientSrc), true)
   check('⭐ input-not-cleared 说清了动作', /请重试/.test(clientSrc), true)
-  check('⭐ 早期放弃说清了动作', /请确认 LDW 页面正常后重试/.test(clientSrc), true)
+  check('⭐ 早期放弃说清了动作', /请确认「网页版对话」页面正常后重试/.test(clientSrc), true)
 }
 
 console.log(`\n=== 结果：${pass} 通过 / ${fail} 失败 ===`)

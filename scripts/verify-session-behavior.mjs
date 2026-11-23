@@ -292,7 +292,14 @@ console.log('\n[12] ⭐⭐ 回归：发送确认不能读**摘除的旧节点**'
    */
   const chatSrc = readFileSync(join(ROOT, 'src', 'client', 'chat.ts'), 'utf8')
   /** 探测里必须重新找输入框。 */
-  check('⭐⭐ 探测里重新 findInput', /function probe\(\) \{[\s\S]{0,300}?var fresh = findInput\(\)/.test(chatSrc), true)
+  /**
+   * ⚠️ 窗口 300 → 3000：probe 里先跑验证墙闸门，300 字符到不了 findInput。
+   */
+  check(
+    '⭐⭐ 探测里重新 findInput',
+    /function probe\(\) \{[\s\S]{0,3000}?var fresh = findInput\(\)/.test(chatSrc),
+    true,
+  )
   check('⭐ 用 fresh 而不是旧的 input', /var now = readInput\(fresh\)/.test(chatSrc), true)
   /** 找不到输入框时算成功（页面在重渲染，别误报）。 */
   check('⭐⭐ 找不到输入框算成功', /if \(!fresh\) \{[\s\S]{0,400}?ok\(\{ note: 'input-gone' \}\)/.test(chatSrc), true)

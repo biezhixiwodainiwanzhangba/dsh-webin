@@ -1,3 +1,58 @@
+## v0.3.0
+
+### 仅桌面版 DSH 可用（本次明确声明）
+
+插件取宿主桥的方式是 `globalThis.dshDesktop.browser`（`protocolVersion === 1`），
+**只有带 Electron 通道的桌面宿主**提供它。纯 Web 版 DSH 装了只会落进「面板未就绪」，
+这是宿主缺能力，不是插件出错。`package.json` 的 `engines.dsh` 已声明 `>=0.2.2-rc.5`。
+
+### 界面：从「LDW」改成能看懂的「网页版对话」
+
+- 标签名 `LDW` → **网页版对话**，设置页 → **网页版对话设置**；平台显示名去掉内部代号（深度求索 · 快速 / 深度思考、通义千问、豆包…）
+- 面板条重做：平台下拉（自绘箭头）+ 登录状态徽标 + 状态胶囊（悬停看发送方式）+ 新对话 / 诊断 / 刷新
+- 面板内容圆角裁切 + 内边距，webview 不再贴边发白
+- 标签**平时收起**：不占标签栏，从输入框「+」菜单呼出；只隐藏非激活的网页版标签，被激活时正常显示
+
+### 入口：搬进输入框「+」菜单
+
+`ctx.inject(['commandUi'])` 注册一条 `popupSelect` 贡献（**作用域注入**，服务缺失只是少一个菜单项，不会连累面板挂载）：
+
+- 「打开网页版对话」
+- 「网页版对话 · 换平台」：每个平台一行，当前平台标 active
+- 「网页版对话 · 换模型」：每个模型一行，选中后走 `modelDirectories…select()` 同步当前会话模型
+
+输入框左下角原来的常驻按钮已撤掉。
+
+### 验证墙（captcha）不再假装成功
+
+站点弹验证时，输入框同样会被清空，旧逻辑据此判「已发出」然后干等 10 分钟。现在：
+
+- `chat.ts` 三份内联 `wall()` 判定（属性选择器 + 弹层文案，两档），`buildWallCheckScript()` 供客户端轮询
+- `fill` / `trigger` 各设闸门，命中即 `stage: 'captcha'` / `reason: 'captcha'`
+- 客户端等回复期间每 `WALL_CHECK_MS = 6_000` 复查一次，命中立刻停轮、报「请人工过验证后再发」，并回写 job 说明**这轮没进对话**
+
+### 只发我的原话（`userOnly`，默认开）
+
+网页版聊天框里只出现你输入的那句，不再把系统提示词、工具目录、历史一起塞进去 —— 也就不会再被网页版的上下文带跑偏。关掉它才会走完整 prompt 与工具协议。
+
+### 交付判定：增量差分 + 历史安全闸门
+
+- 发送前记下页面正文基线，回复只取**基线之后新增的部分**，`stripEcho` 切掉回显
+- 交付需要 `historySafe`（增量命中，或选择器精确且条数/内容确实变了）才算到货，避免把上一轮的旧正文当成本轮回复
+
+### 拟人键入
+
+`typeHuman`：逐字 `keydown → beforeinput → input → keyup`，节奏随长度收缩；超长文本（> 400 字）退回一次性赋值并标注。
+
+### 平台记忆
+
+面板记住上次选的平台（`dsh-webin:platform`），不再每次重载都跳回默认站点。
+
+### 验证
+
+51 套 verify 脚本全绿（含新增 `verify-wall` / `verify-delta` / `verify-useronly` / `verify-command-menu` / `verify-tab-hide` / `verify-composer` / `verify-labels` / `verify-platform-memory` / `verify-picker-gate`）。
+
+---
 ## v0.2.25
 
 ### 合并社区 PR #3（by [@zgbkdzj](https://github.com/zgbkdzj)）

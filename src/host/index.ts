@@ -620,6 +620,11 @@ export async function apply(ctx: {
      */
     isLoggedIn: (platform) => isPlatformLoggedIn(platform),
     /**
+     * 模型选择器开关：默认关（用户要求「只开面板，不列模型」）。
+     * 必须是**函数**——设置页改完立刻生效，不用重启。
+     */
+    exposeModels: () => readConfig().config.exposeModelsInPicker,
+    /**
      * ⭐ 宿主能力——把“无人领活”说到底。
      *
      * 无桥环境里面板不会来领活，而“标签没打开”与“宿主没通道”
@@ -663,10 +668,17 @@ export async function apply(ctx: {
 
   /** 当前注册了哪些路由（自定义 provider 增删后要重注册）。 */
   let registeredRoutes: string[] = []
-  const syncProviders = (): void => {
+  /**
+   * 重新注册 provider 路由。
+   *
+   * @param force 路由集合没变也强制重注册 —— **配置开关（exposeModelsInPicker）
+   *   改完必须走这条**：`listModels` 的结果变了，但路由集合没变，
+   *   不重注册就不会触发 `llm/adapters-updated`，选择器会一直显示旧清单。
+   */
+  const syncProviders = (force = false): void => {
     const routes = registry.all().map((p) => routeFor(p.id))
     // 路由集合没变就不动 —— 重复注册同一个 provider 会抛 DUPLICATE_ADAPTER
-    if (routes.length === registeredRoutes.length && routes.every((r, i) => r === registeredRoutes[i])) return
+    if (!force && routes.length === registeredRoutes.length && routes.every((r, i) => r === registeredRoutes[i])) return
     for (const route of registeredRoutes) disposers.get(route)?.()
     disposers.clear()
     for (const route of routes) {
@@ -757,7 +769,7 @@ export async function apply(ctx: {
         if (known === undefined) {
           sendJson(res, 409, {
             ok: false,
-            reason: '还不知道该平台的 partition —— 请先打开 LDW 标签让它上报',
+            reason: '还不知道该平台的 partition —— 请先打开「网页版对话」标签让它上报',
           })
           return
         }
@@ -1340,6 +1352,8 @@ export async function apply(ctx: {
           sendJson(res, 500, { ok: false, reason: `写入失败：${(error as Error)?.message ?? String(error)}` })
           return
         }
+        /** 开关可能变了（exposeModelsInPicker）⇒ 强制重注册，让选择器立刻刷新。 */
+        syncProviders(true)
         log.info?.(`配置已更新：${describeConfig(checked.config)}`)
         sendJson(res, 200, {
           ok: true,
@@ -1363,6 +1377,7 @@ export async function apply(ctx: {
           sendJson(res, 500, { ok: false, reason: `写入失败：${(error as Error)?.message ?? String(error)}` })
           return
         }
+        syncProviders(true)
         log.info?.('配置已恢复默认')
         sendJson(res, 200, { ok: true, config: { ...DEFAULT_CONFIG }, problems: [], summary: describeConfig(DEFAULT_CONFIG) })
         return

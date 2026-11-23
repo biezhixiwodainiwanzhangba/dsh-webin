@@ -96,7 +96,7 @@ export interface Provider {
  */
 const DEEPSEEK: Provider = {
   id: 'deepseek',
-  name: 'LDW · DeepSeek 网页版',
+  name: 'DeepSeek 网页版',
   homeUrl: 'https://chat.deepseek.com/',
   urlPattern: 'chat\\.deepseek\\.com',
   input: {
@@ -137,8 +137,8 @@ const DEEPSEEK: Provider = {
   completionPath: '/api/v0/chat/completion',
   stopPath: '/api/v0/chat/stop_stream',
   models: [
-    { id: 'ldw-fast', name: 'LDW · 快速模式', description: '真实浏览器驱动，不思考', thinking: false },
-    { id: 'ldw-think', name: 'LDW · 深度思考', description: '真实浏览器驱动，开启思考', thinking: true },
+    { id: 'ldw-fast', name: '深度求索 · 快速', description: '真实浏览器驱动，不思考', thinking: false },
+    { id: 'ldw-think', name: '深度求索 · 深度思考', description: '真实浏览器驱动，开启思考', thinking: true },
   ],
   contextWindow: 1_048_576,
   maxOutputTokens: 32_768,
@@ -163,7 +163,7 @@ const DEEPSEEK: Provider = {
  */
 const QWEN: Provider = {
   id: 'qwen',
-  name: 'LDW · 通义千问',
+  name: '通义千问',
   homeUrl: 'https://www.tongyi.com/qianwen/',
   urlPattern: '(tongyi\\.com|qwen\\.(ai|chat))',
   input: {
@@ -211,14 +211,19 @@ const QWEN: Provider = {
   },
   completionPath: '/api/v1/chat/completions',
   models: [
-    { id: 'qwen-fast', name: 'LDW · 通义千问', description: '真实浏览器驱动', thinking: false },
+    { id: 'qwen-fast', name: '通义千问', description: '真实浏览器驱动', thinking: false },
   ],
   contextWindow: 131_072,
   maxOutputTokens: 8_192,
 }
 
 /** 内置 provider 表。新增站点在这里加一项即可。 */
-export const BUILTIN_PROVIDERS: Provider[] = [DEEPSEEK, QWEN]
+export const BUILTIN_PROVIDERS: Provider[] = [DEEPSEEK, QWEN,
+  {"contextWindow":131072,"send":{"vetoes":["upload","attach","停止","stop","语音","image"],"selectors":["button[type=\"submit\"]","button[aria-label*=\"发送\"]","[data-testid*=\"send\" i]","[class*=\"send\"]","button[class*=\"submit\"]"]},"name":"豆包","input":{"selectors":["textarea[placeholder*=\"发消息\"]","textarea[placeholder*=\"输入\"]","div[contenteditable=\"true\"]","[role=\"textbox\"]","textarea[placeholder*=\"问\"]","textarea[placeholder*=\"发送消息\"]","textarea"]},"homeUrl":"https://www.doubao.com/chat/","completionPath":"/api/chat/completion","models":[{"name":"豆包","description":"真实浏览器驱动","thinking":false,"id":"doubao-fast"}],"maxOutputTokens":8192,"urlPattern":"doubao\\.com","id":"doubao"},
+  {"contextWindow":131072,"send":{"vetoes":["upload","attach","停止","stop","语音","image"],"selectors":["button[type=\"submit\"]","button[aria-label*=\"发送\"]","[data-testid*=\"send\" i]","[class*=\"send\"]","button[class*=\"submit\"]"]},"name":"腾讯元宝","input":{"selectors":["textarea[placeholder*=\"元宝\"]","textarea[placeholder*=\"问\"]","textarea[placeholder*=\"输入\"]","div[contenteditable=\"true\"]","textarea","[role=\"textbox\"]"]},"homeUrl":"https://yuanbao.tencent.com/","completionPath":"/api/chat","models":[{"name":"腾讯元宝","description":"真实浏览器驱动","thinking":false,"id":"hunyuan-fast"}],"maxOutputTokens":8192,"urlPattern":"yuanbao\\.tencent\\.com","id":"hunyuan"},
+			{"contextWindow":131072,"send":{"vetoes":["upload","attach","停止","stop","语音","image"],"selectors":["button[type=\"submit\"]","button[aria-label*=\"发送\"]","[data-testid*=\"send\" i]","[class*=\"send\"]","button[class*=\"submit\"]"]},"name":"Kimi","input":{"selectors":["textarea[placeholder*=\"提问\"]","textarea[placeholder*=\"Kimi\"]","textarea[placeholder*=\"输入\"]","textarea[placeholder*=\"问\"]","textarea[placeholder*=\"发送消息\"]","div[contenteditable=\"true\"]","textarea","[role=\"textbox\"]"]},"homeUrl":"https://www.kimi.com/","completionPath":"/api/chat/completion","models":[{"name":"Kimi","description":"真实浏览器驱动","thinking":false,"id":"kimi-fast"}],"maxOutputTokens":8192,"urlPattern":"(kimi\\.com|kimi\\.moonshot\\.cn)","id":"kimi"},
+			{"contextWindow":131072,"send":{"vetoes":["upload","attach","停止","stop","语音","image"],"selectors":["button[type=\"submit\"]","button[aria-label*=\"发送\"]","[data-testid*=\"send\" i]","[class*=\"send\"]","button[class*=\"submit\"]"]},"name":"智谱清言","input":{"selectors":["textarea[placeholder*=\"输入\"]","textarea[placeholder*=\"问\"]","textarea[placeholder*=\"发送消息\"]","div[contenteditable=\"true\"]","textarea","[role=\"textbox\"]"]},"homeUrl":"https://chatglm.cn/","completionPath":"/api/chat/completion","models":[{"name":"智谱清言","description":"真实浏览器驱动","thinking":false,"id":"glm-fast"}],"maxOutputTokens":8192,"urlPattern":"chatglm\\.cn","id":"chatglm"},
+]
 
 /** 默认 provider（首个内置项）。 */
 export const DEFAULT_PROVIDER_ID = DEEPSEEK.id

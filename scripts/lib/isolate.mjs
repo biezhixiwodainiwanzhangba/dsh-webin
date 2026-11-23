@@ -30,7 +30,7 @@
  * ⚠️ 必须在**动态 import 插件产物之前**调用 —— 插件在模块加载期就可能
  * 计算 `stateRoot()`（它读 `DSH_HOME` 环境变量）。
  */
-import { mkdtempSync, rmSync, mkdirSync } from 'node:fs'
+import { mkdtempSync, rmSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
@@ -52,4 +52,24 @@ export function isolate(label = 'dsh-webin-test') {
       /* 删不掉不致命 */
     }
   }
+}
+
+/**
+ * 打开「模型选择器里列模型」。
+ *
+ * 插件默认 `exposeModelsInPicker: false` —— 用户要求：模型选择器里不列 LDW
+ * 条目，只要标签页能打开网页对话（m01479）。但 adapter 层测试要验证
+ * `listModels` 的真实清单 ⇒ 这些测试先把这个开关打开。
+ *
+ * @param patch - 额外写进配置的字段（如 `{ userOnly: false }`），会合并。
+ */
+export function enableModelPicker(patch = {}) {
+  const path = join(process.env.DSH_HOME, 'webin', 'config.json')
+  let current = {}
+  try {
+    current = JSON.parse(readFileSync(path, 'utf8'))
+  } catch {
+    /* 文件不存在 / 坏了都从空开始 */
+  }
+  writeFileSync(path, JSON.stringify({ ...current, exposeModelsInPicker: true, ...patch }, null, 2), 'utf8')
 }

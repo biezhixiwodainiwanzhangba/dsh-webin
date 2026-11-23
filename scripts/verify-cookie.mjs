@@ -133,7 +133,7 @@ console.log('\n[6] ⭐⭐ 存档 / 写回两个路由都在')
   check('⭐ POST /auth/<p>/cookies 存档', /method === 'POST' && pathname\.startsWith\(`\$\{API_PREFIX\}\/auth\/`\) && pathname\.endsWith\('\/cookies'\)/.test(hostSrc), true)
   check('⭐ GET /auth/<p>/cookies 写回', /method === 'GET' && pathname\.startsWith\(`\$\{API_PREFIX\}\/auth\/`\) && pathname\.endsWith\('\/cookies'\)/.test(hostSrc), true)
   /** 还没上报 partition 时要给出可照做的提示，而不是笼统报错。 */
-  check('⭐ 未上报时提示去开 LDW', /请先打开 LDW 标签让它上报/.test(hostSrc), true)
+  check('⭐ 未上报时提示去开「网页版对话」', /请先打开「网页版对话」标签让它上报/.test(hostSrc), true)
   /** 环境不支持时用 501 明确区分（而不是 500 假装是 bug）。 */
   check('⭐ 环境不支持用 501', /sendJson\(res, 501/.test(hostSrc), true)
 }

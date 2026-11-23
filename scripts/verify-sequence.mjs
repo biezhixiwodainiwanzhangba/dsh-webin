@@ -225,11 +225,19 @@ console.log('\n[9] ⭐⭐ 完整时序：从发送到交付的总耗时是否合
 console.log('\n[10] ⭐⭐ 交付后必须复位状态（否则下轮读到旧内容）')
 {
   /** 对应源码里的 `clearPending()` —— 收口函数要清 6 个字段。 */
-  const fn = /const clearPending = \(\) => \{([\s\S]{0,500}?)\}/.exec(clientSrc)
-  check('找到 clearPending', fn !== null, true)
-  const fields = ['pendingJobRef', 'pendingSinceRef', 'scrapedRef', 'scrapedChangedAtRef', 'baselineRef', 'baselineTextRef']
-  for (const f of fields) {
-    check(`清 ${f}`, new RegExp(`${f}\\.current = `).test(fn[1]), true)
+  /**
+   * ⚠️ 用 indexOf 取函数体（`{0,500}?}` 这种带上限的正则在清理项变多后
+   * 会静默匹配失败，整段断言变成空跑）。
+   */
+  const iClear = clientSrc.indexOf('const clearPending = () => {')
+  const iClearEnd = iClear === -1 ? -1 : clientSrc.indexOf('\n      }', iClear)
+  const clearBody = iClear === -1 || iClearEnd === -1 ? null : clientSrc.slice(iClear, iClearEnd)
+  check('找到 clearPending', clearBody !== null, true)
+  const fields = ['pendingJobRef', 'pendingSinceRef', 'scrapedRef', 'scrapedChangedAtRef', 'baselineRef', 'baselineTextRef', 'baselinePageRef']
+  if (clearBody !== null) {
+    for (const f of fields) {
+      check(`清 ${f}`, new RegExp(`${f}\\.current = `).test(clearBody), true)
+    }
   }
   /** 模拟：交付后复位，下轮不该立刻交付。 */
   const s = freshState()

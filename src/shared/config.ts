@@ -66,6 +66,35 @@ export interface WebinConfig {
    * 设置页保留开关：想试的用户可自己打开，但默认必须关。
    */
   enableTools: boolean
+  /**
+   * **只发用户原话**（默认开）—— 不带系统提示词、工具目录、历史。
+   *
+   * ## 用户原话（就是要这个行为）
+   *
+   * > 把我输入的生成一首诗直接输入进去不就行了，为什么每次都要接一堆额外的提示词？
+   *
+   * 现象：网页输入框里塞进去的是「系统提示词 + 工具协议目录 + 全部历史 +
+   * 用户那句话」，用户在页面上看得见那一大坨，而且模型被它带跑。
+   *
+   * 开了这个开关后，发给网页的**只有最后一条 user 消息的原文**（逐字，
+   * 不加任何前后缀）—— 语义上就是「我在网页版里打了这句话」。
+   * 代价：网页端看不到 DSH 的系统提示词与工具目录，工具循环可能不成立；
+   * 想要完整 harness 语义就把它关掉。
+   */
+  userOnly: boolean
+  /**
+   * 是否把网页版模型列进 DSH 的**模型选择器**。
+   *
+   * ## ⚠️ 默认 **false** —— 用户原话（m01479）
+   *
+   * > 把这个插件改一下吧，不要在模型选择里显示乱七八糟的东西，
+   * > 我最开始的要求只要能打开其他 ai 的对话窗口就够了。
+   *
+   * 关掉只影响**列出**：LDW 面板（webview）照常打开、照常对话；
+   * 老会话里已经存了 `webin-*` 模型也仍能跑（`resolveModel/prepareCall`
+   * 不看这个开关），只是新会话在选择器里看不到它们，也就选不到了。
+   */
+  exposeModelsInPicker: boolean
   /** 登录态快照保存间隔（毫秒）。 */
   snapshotIntervalMs: number
 
@@ -124,6 +153,16 @@ export const DEFAULT_CONFIG: WebinConfig = {
    * —— cuckoo 也把工具目录发进网页），不是缺陷。
    */
   enableTools: true,
+  /**
+   * ⚠️ 默认**开** —— 用户实测的直接要求：只把「我打的那句话」发进网页。
+   * 关掉才回到「系统提示词 + 工具目录 + 历史」的全量差分发送。
+   */
+  userOnly: true,
+  /**
+   * ⚠️ 默认**关** —— 「模型选择器里别列一堆 LDW 条目，只要面板能开网页对话」。
+   * 想要老的「把网页版当模型用」体验，才在设置页打开它。
+   */
+  exposeModelsInPicker: false,
   snapshotIntervalMs: 30_000,
 
   verboseLog: false,
@@ -224,6 +263,7 @@ export function describeConfig(config: WebinConfig): string {
     config.maxRequestsPerTurn > 0 ? `单轮上限 ${config.maxRequestsPerTurn}` : '单轮不限',
     `超时 ${Math.round(config.replyTimeoutMs / 1000)}s`,
     config.enableTools ? '工具 开' : '工具 关',
+    config.exposeModelsInPicker ? '选择器 列模型' : '选择器 只开面板',
   ]
   return parts.join('，')
 }

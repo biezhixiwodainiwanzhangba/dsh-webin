@@ -18,7 +18,7 @@
  * - host 的 `GET /providers` 返回设置页需要的全部字段
  * - 设置页确实渲染出平台卡片（用 React 服务端渲染做真实渲染验证）
  */
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 
 /**
@@ -28,8 +28,16 @@ import { join, dirname } from 'node:path'
  * **不报错、不崩**，只是 var() 取不到值 ⇒ 颜色悄悄失效。所以必须拿真实
  * 产物核对，不能靠肉眼 review。
  */
-const DSH_ASAR_PATH =
-  process.env.DSH_ASAR_PATH ?? 'F:/AdobeAll/DeepSeekHarness/resources/app.asar'
+/**
+ * ⚠️ 路径**不能写死一台机器**（历史 bug：换机器/换安装目录后整套检查崩掉）。
+ * 依次试：环境变量 ⇒ 常见安装位；都找不到就**跳过**令牌核对并说明原因。
+ */
+const DSH_ASAR_PATH = [
+  process.env.DSH_ASAR_PATH,
+  'D:/sbdeepseek/resources/app.asar',
+  'F:/AdobeAll/DeepSeekHarness/resources/app.asar',
+  'C:/Program Files/DeepSeekHarness/resources/app.asar',
+].find((p) => typeof p === 'string' && p !== '' && existsSync(p)) ?? null
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { isolate } from './lib/isolate.mjs'
 
@@ -166,7 +174,7 @@ console.log('[1] client 注册 settings.section（两个静默失败点）')
   check('⭐ register 的 options 带 name', /name:\s*"settings\.section"/.test(client), true)
   check('带 id', /id:\s*"ldw"/.test(client), true)
   check('带 order', /order:\s*47/.test(client), true)
-  check('带 label（显示名）', /label:\s*\(\)\s*=>\s*"LDW/.test(client), true)
+  check('带 label（显示名）', /label:\s*\(\)\s*=>\s*SETTINGS_NAME/.test(client), true)
   /** 渲染函数必须返回元素 —— 不能是裸引用。 */
   check('⭐ 渲染函数返回 createElement', /createElement\(LdwSettings\)/.test(client), true)
 }
@@ -474,6 +482,9 @@ console.log('\n[主题令牌] ⭐⭐⭐ 只用 DSH 真实存在的 --dsw-* 令�
    * ⚠️ 这类错误的特征：**不报错、不崩、只是颜色/字号悄悄不对**。
    *    所以必须机器核对，不能靠肉眼 review。
    */
+  if (DSH_ASAR_PATH === null) {
+    console.log('  SKIP 找不到 DSH 的 app.asar —— 设 DSH_ASAR_PATH 可启用令牌核对')
+  } else {
   const dsh = readFileSync(DSH_ASAR_PATH, 'latin1')
   const declared = new Set()
   for (const m of dsh.matchAll(/(--dsw-[a-z0-9-]+)\s*:/g)) declared.add(m[1])
@@ -493,6 +504,7 @@ console.log('\n[主题令牌] ⭐⭐⭐ 只用 DSH 真实存在的 --dsw-* 令�
   check('⭐⭐ 主按钮文字色用 label-primary-inverted', /label-primary-inverted/.test(src), true)
   check('⭐ 没有 label-on-accent', /label-on-accent/.test(src), false)
   check('⭐ 没有 font-xs-12', /--dsw-font-xs-12/.test(src), false)
+  }
 }
 
 console.log(`\n=== 结果：${pass} 通过 / ${fail} 失败 ===`)
