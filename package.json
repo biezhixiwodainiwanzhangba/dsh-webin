@@ -1,7 +1,7 @@
 {
   "name": "dsh-webin",
   "version": "0.3.0",
-  "description": "仅桌面版 DSH（Electron webview 桥）可用。非官方插件：用真实浏览器驱动 chat.deepseek.com / 豆包 等网页版 — 真登录、真打字、真发送，回复从页面 DOM 读出，可作为 DSH 模型 provider。",
+  "description": "仅桌面版 DSH（Electron webview 桥）可用。非官方插件：用真实浏览器驱动 chat.deepseek.com / 豆包 等网页版 — 真登录、真打字、真发送，回复从页面 DOM 读出，可作为 DSH 模型 provider。派生自 cv-superding/dsh-webin（Apache-2.0）。",
   "type": "module",
   "main": "./lib/index.js",
   "exports": {
@@ -18,7 +18,8 @@
     "cordis.patch.yml",
     "README.md",
     "provider.example.json",
-    "CHANGELOG.md"
+    "CHANGELOG.md",
+    "NOTICE"
   ],
   "license": "Apache-2.0",
   "repository": {
@@ -26,9 +27,9 @@
     "url": "git+https://github.com/cv-superding/dsh-webin.git"
   },
   "bugs": {
-    "url": "https://github.com/cv-superding/dsh-webin/issues"
+    "url": "https://github.com/biezhixiwodainiwanzhangba/dsh-webin/issues"
   },
-  "homepage": "https://github.com/cv-superding/dsh-webin#readme",
+  "homepage": "https://github.com/biezhixiwodainiwanzhangba/dsh-webin#readme",
   "keywords": [
     "dsh",
     "deepseek-harness",

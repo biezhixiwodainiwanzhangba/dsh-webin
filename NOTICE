@@ -1,0 +1,37 @@
+dsh-webin
+Copyright 2026 the dsh-webin contributors
+
+本作品是开源项目的派生版本（derivative work），基于：
+
+  cv-superding/dsh-webin  https://github.com/cv-superding/dsh-webin
+  Copyright 2026 cv-superding (moChen)
+  许可：Apache License 2.0
+
+派生来源为该仓库 main 分支 v0.2.25（提交 dfa52627e9bec84f269e9fa78e8e342a98dea0e3）。
+派生仓库：https://github.com/biezhixiwodainiwanzhangba/dsh-webin
+
+依照 Apache License 2.0 第 4(b) 条，此处说明本派生版本对原作品的修改：
+
+  - 界面：标签与设置页改为「网页版对话」，面板工具条重做，标签栏默认收起、改由输入框「+」菜单呼出
+  - 入口：通过宿主 commandUi 服务注册 popupSelect 贡献，可切换平台与模型
+  - 发送链路：新增只发用户原话模式（userOnly）、拟人逐字键入、页面验证墙（captcha）检测与阻断
+  - 回复读取：新增页面正文增量差分与回显剔除，并把「历史安全」作为交付前置条件
+  - 宿主交互：输入框收起/弹出、平台选择记忆、桌面版能力前置说明
+  - 工程：新增 20 余个 verify 脚本与发布元数据（engines.dsh、files 白名单）
+
+完整改动见 CHANGELOG.md 的 v0.3.0 段。
+
+本项目与原作者的官方发行版相互独立，不代表原作者背书；
+「dsh-webin」名称沿用自上游仓库，仅用于指明派生关系。
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.

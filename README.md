@@ -3,6 +3,22 @@
 > **仅桌面版 DSH 可用。** 本插件依赖 Electron 宿主的 webview guest 桥（`globalThis.dshDesktop.browser`）。
 > 纯 Web 版 DSH 没有这个桥 —— 装了只会显示「面板未就绪」，不是 bug。
 
+## 来源与授权
+
+**这是 `cv-superding/dsh-webin`（作者 moChen）的派生版本**，接在它的 v0.2.25 之后继续维护，
+遵循原项目的 Apache License 2.0。原始提交历史完整保留在本仓库中（作者署名未改）。
+
+| | |
+|---|---|
+| 上游 | `https://github.com/cv-superding/dsh-webin`（v0.2.25 = `dfa5262`）|
+| 本派生 | `https://github.com/biezhixiwodainiwanzhangba/dsh-webin` |
+| 许可证 | Apache-2.0，修改说明见 [NOTICE](NOTICE)，改动清单见 [CHANGELOG.md](CHANGELOG.md) |
+
+同名 fork 说明：`zgbkdzj/dsh-webin`（袋子君）与本站是**同一上游的两个不同 fork**，
+不是彼此的后续版本 —— 他那份停在 v0.2.24，本仓库接的是 v0.2.25。
+
+本项目是社区派生版本，不代表原作者背书；名称「dsh-webin」沿用自上游，仅用于指明派生关系。
+
 Unofficial DSH plugin — 用**真实浏览器**驱动多个 AI 网页版（DeepSeek / 通义千问 / …）。
 
 核心思路是**不设计协议，操作界面**：打开真浏览器 → 用真实输入把字打进输入框 →
