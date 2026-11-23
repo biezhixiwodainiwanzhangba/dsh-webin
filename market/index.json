@@ -1,0 +1,46 @@
+{
+  "format": 1,
+  "title": "dsh-webin 插件源",
+  "description": "本地自建插件源：网页版对话（dsh-webin）",
+  "metadata": {
+    "categories": {},
+    "labels": {},
+    "sortKeys": {}
+  },
+  "plugins": [
+    {
+      "name": "dsh-webin",
+      "title": "网页版对话",
+      "description": "仅桌面版 DSH 可用。在 DSH 里用真实浏览器驱动 chat.deepseek.com / 豆包 / 千问 等网页版：真登录、真打字、真发送，回复从页面读出，可作为模型 provider。",
+      "author": "cv-superding",
+      "homepage": "https://github.com/biezhixiwodainiwanzhangba/dsh-webin",
+      "repository": {
+        "url": "https://github.com/biezhixiwodainiwanzhangba/dsh-webin"
+      },
+      "metadata": {
+        "keywords": [
+          "dsh-plugin",
+          "webview",
+          "chat.deepseek.com",
+          "browser-automation"
+        ],
+        "labels": [],
+        "sortKeys": {}
+      },
+      "versions": [
+        {
+          "version": "0.3.0",
+          "publishTimestamp": 1795411419,
+          "source": {
+            "type": "git",
+            "url": "https://github.com/biezhixiwodainiwanzhangba/dsh-webin",
+            "commit": "1e6107f80079173e179952f84df30d0d5e5671f8"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.5"
+          }
+        }
+      ]
+    }
+  ]
+}
