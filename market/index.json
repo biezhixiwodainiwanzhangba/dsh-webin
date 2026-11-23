@@ -1,7 +1,7 @@
 {
   "format": 1,
   "title": "dsh-webin 插件源",
-  "description": "本地自建插件源：网页版对话（dsh-webin）",
+  "description": "网页版对话（dsh-webin）0.3.0 —— 派生自 cv-superding/dsh-webin，Apache-2.0",
   "metadata": {
     "categories": {},
     "labels": {},
@@ -11,8 +11,8 @@
     {
       "name": "dsh-webin",
       "title": "网页版对话",
-      "description": "仅桌面版 DSH 可用。在 DSH 里用真实浏览器驱动 chat.deepseek.com / 豆包 / 千问 等网页版：真登录、真打字、真发送，回复从页面读出，可作为模型 provider。",
-      "author": "cv-superding",
+      "description": "仅桌面版 DSH 可用。在 DSH 里用真实浏览器驱动 chat.deepseek.com / 豆包 / 千问 等网页版：真登录、真打字、真发送，回复从页面读出，可作为模型 provider。派生自 cv-superding/dsh-webin（Apache-2.0）。",
+      "author": "biezhixiwodainiwanzhangba",
       "homepage": "https://github.com/biezhixiwodainiwanzhangba/dsh-webin",
       "repository": {
         "url": "https://github.com/biezhixiwodainiwanzhangba/dsh-webin"
@@ -30,11 +30,11 @@
       "versions": [
         {
           "version": "0.3.0",
-          "publishTimestamp": 1795411419,
+          "publishTimestamp": 1795413335,
           "source": {
             "type": "git",
             "url": "https://github.com/biezhixiwodainiwanzhangba/dsh-webin",
-            "commit": "1e6107f80079173e179952f84df30d0d5e5671f8"
+            "commit": "8daf272e05b43a695e646e6f78637499c03cca20"
           },
           "engines": {
             "dsh": ">=0.2.2-rc.5"
